@@ -158,26 +158,36 @@ func processRequest(e endpoint, rw http.ResponseWriter, r *http.Request) {
 		UUID:       uuid.NewString(),
 		Method:     r.Method,
 		Path:       r.URL.RawPath,
+		Headers:    make(map[string][]string),
 		BodyBase64: base64.StdEncoding.EncodeToString(body),
 	}
-	e.responses[req.UUID] = make(chan response)
+	for k, v := range r.Header {
+		req.Headers[k] = v
+	}
+	responseChannel := make(chan response)
+	e.responses[req.UUID] = responseChannel
 	defer delete(e.responses, req.UUID)
 	e.requests <- req
 
 	// read 1 response
-	resp := <-e.responses[req.UUID]
-	body, err = base64.StdEncoding.DecodeString(resp.BodyBase64)
-	if err != nil {
-		http.Error(rw, "Invalid proxy response", http.StatusInternalServerError)
-		return
-	}
-	for k, v := range resp.Headers {
-		for _, val := range v {
-			rw.Header().Add(k, val)
+	tick := time.NewTimer(10 * time.Second)
+	select {
+	case <-tick.C:
+		http.Error(rw, "Gateway Timeout", http.StatusGatewayTimeout)
+	case resp := <-responseChannel:
+		body, err = base64.StdEncoding.DecodeString(resp.BodyBase64)
+		if err != nil {
+			http.Error(rw, "Invalid proxy response", http.StatusInternalServerError)
+			return
 		}
+		for k, v := range resp.Headers {
+			for _, val := range v {
+				rw.Header().Add(k, val)
+			}
+		}
+		rw.WriteHeader(int(resp.Status))
+		rw.Write([]byte(body))
 	}
-	rw.WriteHeader(int(resp.Status))
-	rw.Write([]byte(body))
 }
 
 func splitPath(p string) (string, string) {
