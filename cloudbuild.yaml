@@ -1,0 +1,27 @@
+steps:
+
+# Build cloud_run_api service
+- id: cloud_run_api_build
+  waitFor: ['-']
+  name: 'gcr.io/kaniko-project/executor:latest'
+  args:
+  - --destination=gcr.io/$PROJECT_ID/github.com/hermanbanken/myrok:$COMMIT_SHA
+  - --cache=true
+  - --cache-ttl=128h
+  - --context=dir://server/cloud_run_api
+
+# Deploy cloud_run_api service
+- id: cloud_run_api_deploy
+  waitFor: ['cloud_run_api_build']
+  name: 'gcr.io/cloud-builders/gcloud'
+  args:
+  - 'beta'
+  - 'run'
+  - 'deploy'
+  - 'myrok'
+  - '--platform=managed'
+  - '--image=gcr.io/$PROJECT_ID/github.com/hermanbanken/myrok:$COMMIT_SHA'
+  - '--region=europe-west4'
+  - '--port=8080'
+  - '--tag=latest'
+
