@@ -12,14 +12,14 @@ ws.addEventListener("message", (message) => {
 	const req = json;
 	console.log("request:", req);
 	const body = "Hello World";
-	const resp = Buffer.from(JSON.stringify({
+	const resp = {
 		uuid: req.uuid,
 		status: 200,
 		headers: { "Content-Length": body.length },
 		body_base64: Buffer.from(body).toString("base64"),
-	}));
+	};
 	console.log("response:", resp);
-	ws.send(resp);
+	ws.send(Buffer.from(JSON.stringify(resp)));
 });
 
 ws.addEventListener("close", () => {
