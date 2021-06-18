@@ -15,7 +15,7 @@ ws.addEventListener("message", (message) => {
 	const resp = {
 		uuid: req.uuid,
 		status: 200,
-		headers: { "Content-Length": body.length },
+		headers: { "Content-Length": [body.length.toString()] },
 		body_base64: Buffer.from(body).toString("base64"),
 	};
 	console.log("response:", resp);
