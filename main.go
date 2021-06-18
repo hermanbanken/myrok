@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -105,7 +108,12 @@ func proxy(rw http.ResponseWriter, r *http.Request) {
 				err := c.ReadJSON(&resp)
 				if err != nil {
 					log.Println("recv:", err)
-					http.Error(rw, err.Error(), http.StatusInternalServerError)
+					if errors.Is(err, net.ErrClosed) {
+						return
+					}
+					close := websocket.FormatCloseMessage(websocket.CloseAbnormalClosure, "error receiving")
+					c.WriteControl(websocket.CloseMessage, close, time.Now().Add(3*time.Second))
+					c.Close()
 					return
 				}
 				log.Printf("response: %+v", resp)
@@ -127,7 +135,12 @@ func proxy(rw http.ResponseWriter, r *http.Request) {
 			err = c.WriteJSON(r)
 			if err != nil {
 				log.Println("write:", err)
-				http.Error(rw, err.Error(), http.StatusInternalServerError)
+				if errors.Is(err, net.ErrClosed) {
+					return
+				}
+				close := websocket.FormatCloseMessage(websocket.CloseAbnormalClosure, "error writing")
+				c.WriteControl(websocket.CloseMessage, close, time.Now().Add(3*time.Second))
+				c.Close()
 				return
 			}
 		}
