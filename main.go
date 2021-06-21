@@ -34,14 +34,14 @@ type response struct {
 }
 
 type endpoint struct {
-	requests  chan request
-	responses map[string]chan response
-	context   context.Context
+	requests chan request
+	context  context.Context
 }
 
 var (
 	upgrader  = websocket.Upgrader{} // use default options
 	endpoints sync.Map
+	responses sync.Map
 )
 
 func main() {
@@ -73,9 +73,8 @@ func proxy(rw http.ResponseWriter, r *http.Request) {
 	endpointID := uuid.New().String()
 	ctx, cancel := context.WithCancel(context.Background())
 	e := endpoint{
-		requests:  make(chan request),
-		responses: make(map[string]chan response),
-		context:   ctx,
+		requests: make(chan request),
+		context:  ctx,
 	}
 	defer cancel()
 	endpoints.Store(endpointID, e)
@@ -118,11 +117,13 @@ func proxy(rw http.ResponseWriter, r *http.Request) {
 					return
 				}
 				log.Printf("response: %+v", resp)
-				inbox := e.responses[resp.UUID]
-				if inbox != nil {
-					inbox <- resp
+				responseChannelIface, hasValue := responses.Load(resp.UUID)
+				responseChannel, okCast := responseChannelIface.(chan response)
+				if hasValue && okCast {
+					responseChannel <- resp
 				} else {
 					log.Printf("response without an inbox (%q): deadletter", resp.UUID)
+					continue
 				}
 			}
 		}
@@ -165,8 +166,8 @@ func processRequest(e endpoint, rw http.ResponseWriter, r *http.Request) {
 		BodyBase64: base64.StdEncoding.EncodeToString(body),
 	}
 	responseChannel := make(chan response)
-	e.responses[req.UUID] = responseChannel
-	defer delete(e.responses, req.UUID)
+	responses.Store(req.UUID, responseChannel)
+	defer responses.Delete(req.UUID)
 	e.requests <- req
 
 	// read 1 response
