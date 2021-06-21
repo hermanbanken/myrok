@@ -157,12 +157,9 @@ func processRequest(e endpoint, rw http.ResponseWriter, r *http.Request) {
 	req := request{
 		UUID:       uuid.NewString(),
 		Method:     r.Method,
-		Path:       r.URL.RawPath,
-		Headers:    make(map[string][]string),
+		Path:       r.URL.Path,
+		Headers:    r.Header,
 		BodyBase64: base64.StdEncoding.EncodeToString(body),
-	}
-	for k, v := range r.Header {
-		req.Headers[k] = v
 	}
 	responseChannel := make(chan response)
 	e.responses[req.UUID] = responseChannel
