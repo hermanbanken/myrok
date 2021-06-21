@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -157,7 +158,7 @@ func processRequest(e endpoint, rw http.ResponseWriter, r *http.Request) {
 	req := request{
 		UUID:       uuid.NewString(),
 		Method:     r.Method,
-		Path:       r.URL.Path,
+		Path:       rawHttpPath(r.URL),
 		Headers:    r.Header,
 		BodyBase64: base64.StdEncoding.EncodeToString(body),
 	}
@@ -193,4 +194,13 @@ func splitPath(p string) (string, string) {
 		return p, ""
 	}
 	return p[0:i], p[i+1:]
+}
+
+// Given a URL it returns approximately the original path
+// including queries, like /foo/bar?search=test+something
+func rawHttpPath(u *url.URL) string {
+	if len(u.RawQuery) > 0 {
+		return u.Path + "?" + u.RawQuery
+	}
+	return u.Path
 }
