@@ -121,6 +121,8 @@ func proxy(rw http.ResponseWriter, r *http.Request) {
 				inbox := e.responses[resp.UUID]
 				if inbox != nil {
 					inbox <- resp
+				} else {
+					log.Printf("response without an inbox (%q): deadletter", resp.UUID)
 				}
 			}
 		}
@@ -184,7 +186,7 @@ func processRequest(e endpoint, rw http.ResponseWriter, r *http.Request) {
 			}
 		}
 		rw.WriteHeader(int(resp.Status))
-		rw.Write([]byte(body))
+		rw.Write(body)
 	}
 }
 
